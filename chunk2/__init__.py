@@ -282,7 +282,7 @@ class Chunk(object):
             pos = pos + self.chunksize
         if pos < 0 or pos > self.chunksize:
             raise RuntimeError
-        if mode == 'w':
+        if self.mode == 'w':
             self.contentfile.seek(self.chunk_offset + pos, 0)
         else:
             self.file.seek(self.chunk_offset + pos, 0)
