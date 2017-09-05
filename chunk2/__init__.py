@@ -107,7 +107,7 @@ class Chunk(object):
     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
     """
 
-    def __init__(self, file, align=True, bigendian=True, inclheader=False, mode='r', name=None, form=None):
+    def __init__(self, ifffile, align=True, bigendian=True, inclheader=False, mode='r', name=None, form=None):
         """Create a Chunk class for reading or writing.
         ``file`` is the underlying file-like object.
         The file-like object is considered seekable if ``file.tell()`` does not raise an exception.
@@ -119,7 +119,6 @@ class Chunk(object):
         If ``name`` is not None (but ``form`` is), then the chunk name (ID) is set to the first four characters of ``name``.
         """
 
-        import struct
         self.closed = False
         self.align = align
         self.inclheader = inclheader
@@ -127,25 +126,25 @@ class Chunk(object):
             self.strflag = '>'
         else:
             self.strflag = '<'
-        self.file = file
+        self.ifffile = ifffile
         self.mode = mode
         if mode not in ('w', 'r'):
             raise ValueError, "mode must be 'r' or 'w'"
 
         if mode == 'r':
-            self.chunkname = file.read(4)
+            self.chunkname = ifffile.read(4)
             if len(self.chunkname) == 0:
                 raise EOFError
             if len(self.chunkname) < 4:
                 raise IOError, 'Truncated chunk'
             try:
-                self.chunksize = struct.unpack(self.strflag + 'L', file.read(4))[0]
+                self.chunksize = struct.unpack(self.strflag + 'L', ifffile.read(4))[0]
             except struct.error:
                 raise IOError, 'Truncated chunk'
             if self.inclheader:
                 self.chunksize = self.chunksize - 8
             try:
-                self.chunk_offset = self.file.tell()
+                self.chunk_offset = self.ifffile.tell()
             except (AttributeError, IOError):
                 self.seekable = False
             else:
@@ -154,11 +153,11 @@ class Chunk(object):
 
         else:
             try:
-                self.chunk_offset = self.file.tell()
+                self.chunk_offset = self.ifffile.tell()
             except (AttributeError, IOError):
                 self.contentfile = cStringIO.StringIO()
             else:
-                self.contentfile = self.file
+                self.contentfile = self.ifffile
             # the content of writable chunks are always seekable
             self.seekable = True
             self.chunk_index = 0
@@ -243,10 +242,10 @@ class Chunk(object):
                     self.contentfile.seek(self.chunk_offset + self.chunksize, 0)
                     if self.align and self.chunksize % 2 == 1:
                         self.contentfile.write('\0')
-                    if self.contentfile != self.file:
-                        self.file.write(self.contentfile.getvalue())
+                    if self.contentfile != self.ifffile:
+                        self.ifffile.write(self.contentfile.getvalue())
                         self.contentfile.close()
-                    self.file.flush()
+                    self.ifffile.flush()
             finally:
                 self.closed = True
 
@@ -285,7 +284,7 @@ class Chunk(object):
         if self.mode == 'w':
             self.contentfile.seek(self.chunk_offset + pos, 0)
         else:
-            self.file.seek(self.chunk_offset + pos, 0)
+            self.ifffile.seek(self.chunk_offset + pos, 0)
         self.chunk_index = pos
 
     def tell(self):
@@ -310,12 +309,12 @@ class Chunk(object):
             return ''
         if size < 0 or size > self.chunksize - self.chunk_index:
             size = self.chunksize - self.chunk_index
-        data = self.file.read(size)
+        data = self.ifffile.read(size)
         self.chunk_index = self.chunk_index + len(data)
         if self.chunk_index == self.chunksize and \
            self.align and \
            (self.chunksize & 1):
-            dummy = self.file.read(1)
+            dummy = self.ifffile.read(1)
             self.chunk_index = self.chunk_index + len(dummy)
         return data
 
@@ -336,7 +335,7 @@ class Chunk(object):
                 # maybe fix alignment
                 if self.align and (self.chunksize & 1):
                     n = n + 1
-                self.file.seek(n, 1)
+                self.ifffile.seek(n, 1)
                 self.chunk_index = self.chunk_index + n
                 return
             except IOError:
@@ -379,7 +378,7 @@ def parse_iff_file(ifffile):
         try:
             ck = parse_chunk(ifffile)
             contents.append(ck)
-        except EOFError,e:
+        except EOFError:
             break
     return contents
 
